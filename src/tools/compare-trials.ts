@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { InvalidInputError, NotFoundError } from "../errors";
+import { InvalidInputError } from "../errors";
 import type { CTGovClient } from "../ctgov/client";
 import type { TrialDetails } from "../ctgov/types";
 
@@ -33,7 +33,11 @@ export async function compareTrialsTool(
         const details = await client.getStudy(nctId);
         return { nctId, details, error: null as string | null };
       } catch (e) {
-        const reason = e instanceof NotFoundError ? "not found" : "upstream error";
+        // Match by discriminating `code` field rather than `instanceof`.
+        // Bundler dedup can break prototype chains across re-exports, so the
+        // class identity check isn't reliable in the deployed Worker.
+        const code = (e as { code?: string })?.code;
+        const reason = code === "NOT_FOUND" ? "not found" : "upstream error";
         return { nctId, details: null as TrialDetails | null, error: reason };
       }
     })
