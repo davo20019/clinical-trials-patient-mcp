@@ -146,6 +146,10 @@ See [`docs/superpowers/specs/`](./docs/superpowers/specs/) for the full design s
 
 ---
 
+## Privacy — zero user data stored
+
+This server stores **no** user data. No accounts, no search history, no saved profiles. Your queries live in memory for one request and are then discarded. Full details in [PRIVACY.md](./PRIVACY.md).
+
 ## Responsible use
 
 This server returns information from a public data source (ClinicalTrials.gov). It does **not** give medical advice, diagnose, or recommend treatment.
