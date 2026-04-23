@@ -23,6 +23,11 @@ import {
   compareTrialsInputSchema,
   COMPARE_TRIALS_DESCRIPTION,
 } from "./tools/compare-trials";
+import {
+  parseEligibilityCriteriaTool,
+  parseEligibilityInputSchema,
+  PARSE_ELIGIBILITY_DESCRIPTION,
+} from "./tools/parse-eligibility-criteria";
 import { isKnownError } from "./errors";
 
 const GLOBAL_DISCLAIMER = `This server provides information from ClinicalTrials.gov to help patients and caregivers discover clinical trials. It is NOT medical advice. Data may lag reality by weeks — always confirm current enrollment by calling the trial site and discuss any trial with the patient's treating physician before acting.`;
@@ -112,6 +117,22 @@ export class ClinicalTrialsPatientMcp extends McpAgent {
       async (input) => {
         try {
           const result = await compareTrialsTool(input, client);
+          return toolResponse(result);
+        } catch (e) {
+          return errorResponse(e);
+        }
+      }
+    );
+
+    this.server.registerTool(
+      "parse_eligibility_criteria",
+      {
+        description: `${PARSE_ELIGIBILITY_DESCRIPTION}\n\n${GLOBAL_DISCLAIMER}`,
+        inputSchema: parseEligibilityInputSchema.shape,
+      },
+      async (input) => {
+        try {
+          const result = await parseEligibilityCriteriaTool(input, client);
           return toolResponse(result);
         } catch (e) {
           return errorResponse(e);
