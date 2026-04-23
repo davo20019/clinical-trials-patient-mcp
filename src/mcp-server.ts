@@ -18,6 +18,11 @@ import {
   getTrialDetailsInputSchema,
   GET_TRIAL_DETAILS_DESCRIPTION,
 } from "./tools/get-trial-details";
+import {
+  compareTrialsTool,
+  compareTrialsInputSchema,
+  COMPARE_TRIALS_DESCRIPTION,
+} from "./tools/compare-trials";
 import { isKnownError } from "./errors";
 
 const GLOBAL_DISCLAIMER = `This server provides information from ClinicalTrials.gov to help patients and caregivers discover clinical trials. It is NOT medical advice. Data may lag reality by weeks — always confirm current enrollment by calling the trial site and discuss any trial with the patient's treating physician before acting.`;
@@ -91,6 +96,22 @@ export class ClinicalTrialsPatientMcp extends McpAgent {
       async (input) => {
         try {
           const result = await getTrialDetailsTool(input, client);
+          return toolResponse(result);
+        } catch (e) {
+          return errorResponse(e);
+        }
+      }
+    );
+
+    this.server.registerTool(
+      "compare_trials",
+      {
+        description: `${COMPARE_TRIALS_DESCRIPTION}\n\n${GLOBAL_DISCLAIMER}`,
+        inputSchema: compareTrialsInputSchema.shape,
+      },
+      async (input) => {
+        try {
+          const result = await compareTrialsTool(input, client);
           return toolResponse(result);
         } catch (e) {
           return errorResponse(e);
