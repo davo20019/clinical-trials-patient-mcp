@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 ![Platform](https://img.shields.io/badge/runtime-Cloudflare%20Workers-F38020)
-![Status](https://img.shields.io/badge/status-in%20development-orange)
+![Status](https://img.shields.io/badge/status-live-brightgreen)
 
 Add one URL to ChatGPT, Claude, or any MCP-compatible client, then ask natural-language questions like:
 
@@ -67,10 +67,11 @@ Returns identification, description, status, design, **full verbatim eligibility
 
 > **⚠️ This is an information tool, not medical advice.** Data may lag reality by weeks. Always confirm current enrollment by calling the trial site, and discuss any trial with the patient's treating physician before acting.
 
-**Endpoint:** `https://<your-deployed-worker>.workers.dev/mcp`
-*(A live hosted URL will be added here once deployed.)*
+**Live endpoint:** `https://clinical-trials-patient-mcp.davo20019.workers.dev/mcp`
 
-**In ChatGPT / Claude / other MCP clients:** add the URL above as a streamable-HTTP MCP server. A legacy SSE endpoint is available at `/sse`.
+**In ChatGPT / Claude / other MCP clients:** add the URL above as a streamable-HTTP MCP server. A legacy SSE endpoint is available at `/sse`, and a health check at `/health`.
+
+> You can also host your own copy in minutes — see [Self-hosting](#self-hosting) below.
 
 ---
 
