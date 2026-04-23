@@ -52,6 +52,39 @@ describe("CTGovClient.searchStudies", () => {
     expect(decodeURIComponent(url)).toContain("PHASE1");
     expect(decodeURIComponent(url)).toContain("EARLY_PHASE1");
   });
+
+  it("passes pageToken to upstream and surfaces nextPageToken in result", async () => {
+    const upstream = {
+      totalCount: 150,
+      studies: [],
+      nextPageToken: "server-returned-token",
+    };
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(upstream), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    const result = await client.searchStudies({
+      condition: "x",
+      pageToken: "incoming-token",
+    });
+
+    expect(fetchFn.mock.calls[0][0].url).toContain("pageToken=incoming-token");
+    expect(result.nextPageToken).toBe("server-returned-token");
+  });
+
+  it("returns nextPageToken: null when upstream omits it", async () => {
+    const upstream = { totalCount: 3, studies: [] };
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(upstream), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    const result = await client.searchStudies({ condition: "x" });
+    expect(result.nextPageToken).toBeNull();
+  });
 });
 
 describe("CTGovClient.getStudy", () => {

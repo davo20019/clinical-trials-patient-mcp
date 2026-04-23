@@ -42,6 +42,7 @@ export class CTGovClient {
     }
     qs.set("pageSize", String(pageSize));
     qs.set("countTotal", "true");
+    if (params.pageToken) qs.set("pageToken", params.pageToken);
 
     const url = `${BASE}/studies?${qs.toString()}`;
     const raw = await this.fetcher.getJson<RawSearchResponse>(url);
@@ -49,6 +50,7 @@ export class CTGovClient {
     return {
       totalCount: raw.totalCount ?? raw.studies.length,
       trials: raw.studies.map(mapRawStudyToSummary),
+      nextPageToken: raw.nextPageToken ?? null,
     };
   }
 
@@ -130,6 +132,7 @@ export function validateNctId(nctId: string): void {
 interface RawSearchResponse {
   studies: RawStudy[];
   totalCount?: number;
+  nextPageToken?: string;
 }
 
 interface RawStudy {

@@ -81,6 +81,7 @@ export interface ConditionMatch {
 export interface SearchResult {
   totalCount: number;
   trials: TrialSummary[];
+  nextPageToken: string | null;
 }
 
 export type PhaseFilter = "1" | "2" | "3" | "4" | "any";
@@ -92,4 +93,5 @@ export interface SearchParams {
   status?: StatusFilter;
   phase?: PhaseFilter;
   pageSize?: number;
+  pageToken?: string;
 }

@@ -19,6 +19,7 @@ describe("searchTrialsTool", () => {
           officialUrl: "https://clinicaltrials.gov/study/NCT00000001",
         },
       ],
+      nextPageToken: null,
     };
     const fakeClient = {
       searchStudies: vi.fn(async () => fakeResult),
@@ -37,6 +38,22 @@ describe("searchTrialsTool", () => {
       pageSize: 5,
     });
     expect(result).toEqual(fakeResult);
+  });
+
+  it("forwards pageToken for pagination", async () => {
+    const fakeResult = { totalCount: 100, trials: [], nextPageToken: "abc123" };
+    const fakeClient = {
+      searchStudies: vi.fn(async () => fakeResult),
+    } as any;
+
+    await searchTrialsTool(
+      { condition: "breast cancer", pageToken: "page2tok" },
+      fakeClient
+    );
+
+    expect(fakeClient.searchStudies).toHaveBeenCalledWith(
+      expect.objectContaining({ pageToken: "page2tok" })
+    );
   });
 
   it("validates inputs", async () => {
