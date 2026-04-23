@@ -21,8 +21,35 @@ export class CTGovClient {
     this.fetcher = opts.fetcher;
   }
 
-  async searchStudies(_params: SearchParams): Promise<SearchResult> {
-    throw new Error("not implemented");
+  async searchStudies(params: SearchParams): Promise<SearchResult> {
+    if (!params.condition || !params.condition.trim()) {
+      throw new InvalidInputError("`condition` is required.");
+    }
+    const pageSize = Math.min(Math.max(params.pageSize ?? 10, 1), 25);
+    const status = params.status ?? "recruiting";
+    const phase = params.phase ?? "any";
+
+    const qs = new URLSearchParams();
+    qs.set("query.cond", params.condition.trim());
+    if (params.location) qs.set("query.locn", params.location.trim());
+    const statusValues = STATUS_MAP[status];
+    if (statusValues.length > 0) {
+      qs.set("filter.overallStatus", statusValues.join(","));
+    }
+    const phaseValues = PHASE_MAP[phase];
+    if (phaseValues && phaseValues.length > 0) {
+      qs.set("filter.phase", phaseValues.join(","));
+    }
+    qs.set("pageSize", String(pageSize));
+    qs.set("countTotal", "true");
+
+    const url = `${BASE}/studies?${qs.toString()}`;
+    const raw = await this.fetcher.getJson<RawSearchResponse>(url);
+
+    return {
+      totalCount: raw.totalCount ?? raw.studies.length,
+      trials: raw.studies.map(mapRawStudyToSummary),
+    };
   }
 
   async getStudy(_nctId: string): Promise<TrialDetails> {
@@ -58,6 +85,174 @@ export function validateNctId(nctId: string): void {
     );
   }
 }
+
+interface RawSearchResponse {
+  studies: RawStudy[];
+  totalCount?: number;
+}
+
+interface RawStudy {
+  protocolSection: {
+    identificationModule?: {
+      nctId: string;
+      briefTitle?: string;
+      officialTitle?: string;
+    };
+    statusModule?: {
+      overallStatus?: string;
+      lastUpdatePostDateStruct?: { date?: string };
+      startDateStruct?: { date?: string };
+      completionDateStruct?: { date?: string };
+    };
+    descriptionModule?: {
+      briefSummary?: string;
+      detailedDescription?: string;
+    };
+    designModule?: {
+      phases?: string[];
+      studyType?: string;
+      enrollmentInfo?: { count?: number };
+      designInfo?: { allocation?: string };
+    };
+    conditionsModule?: { conditions?: string[] };
+    sponsorCollaboratorsModule?: {
+      leadSponsor?: { name?: string };
+      collaborators?: Array<{ name?: string }>;
+    };
+    contactsLocationsModule?: {
+      locations?: Array<{
+        facility?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        status?: string;
+        contacts?: Array<{
+          name?: string;
+          phone?: string;
+          email?: string;
+          role?: string;
+        }>;
+      }>;
+    };
+    eligibilityModule?: {
+      minimumAge?: string;
+      maximumAge?: string;
+      sex?: string;
+      healthyVolunteers?: boolean;
+      eligibilityCriteria?: string;
+    };
+    armsInterventionsModule?: {
+      interventions?: Array<{
+        type?: string;
+        name?: string;
+        description?: string;
+      }>;
+    };
+    referencesModule?: {
+      references?: Array<{ pmid?: string }>;
+    };
+  };
+}
+
+function mapRawStudyToSummary(raw: RawStudy): TrialSummary {
+  const p = raw.protocolSection;
+  const id = p.identificationModule;
+  const nctId = id?.nctId ?? "";
+  return {
+    nctId,
+    title: id?.briefTitle ?? "",
+    briefSummary: p.descriptionModule?.briefSummary ?? "",
+    phase: p.designModule?.phases?.[0] ?? null,
+    status: p.statusModule?.overallStatus ?? "",
+    conditions: p.conditionsModule?.conditions ?? [],
+    locations: (p.contactsLocationsModule?.locations ?? []).map((loc) => ({
+      facility: loc.facility ?? "",
+      city: loc.city ?? "",
+      state: loc.state ?? null,
+      country: loc.country ?? "",
+      recruitingStatus: loc.status ?? null,
+      contacts: (loc.contacts ?? []).map((c) => ({
+        name: c.name ?? null,
+        phone: c.phone ?? null,
+        email: c.email ?? null,
+        role: c.role ?? null,
+      })),
+    })),
+    sponsor: p.sponsorCollaboratorsModule?.leadSponsor?.name ?? "",
+    lastUpdated: p.statusModule?.lastUpdatePostDateStruct?.date ?? "",
+    officialUrl: buildOfficialUrl(nctId),
+  };
+}
+
+// Used by Task 7.
+export function mapRawStudyToDetails(raw: RawStudy): import("./types").TrialDetails {
+  const p = raw.protocolSection;
+  const id = p.identificationModule;
+  const nctId = id?.nctId ?? "";
+  return {
+    identification: {
+      nctId,
+      title: id?.briefTitle ?? "",
+      officialTitle: id?.officialTitle ?? "",
+    },
+    summary: {
+      briefSummary: p.descriptionModule?.briefSummary ?? "",
+      detailedDescription: p.descriptionModule?.detailedDescription ?? null,
+    },
+    status: {
+      overallStatus: p.statusModule?.overallStatus ?? "",
+      startDate: p.statusModule?.startDateStruct?.date ?? null,
+      completionDate: p.statusModule?.completionDateStruct?.date ?? null,
+      lastUpdated: p.statusModule?.lastUpdatePostDateStruct?.date ?? "",
+    },
+    design: {
+      phase: p.designModule?.phases?.[0] ?? null,
+      studyType: p.designModule?.studyType ?? "",
+      enrollmentCount: p.designModule?.enrollmentInfo?.count ?? null,
+      allocation: p.designModule?.designInfo?.allocation ?? null,
+    },
+    eligibility: {
+      minimumAge: p.eligibilityModule?.minimumAge ?? null,
+      maximumAge: p.eligibilityModule?.maximumAge ?? null,
+      sex: p.eligibilityModule?.sex ?? "",
+      healthyVolunteers: p.eligibilityModule?.healthyVolunteers ?? false,
+      criteria: p.eligibilityModule?.eligibilityCriteria ?? "",
+    },
+    locations: (p.contactsLocationsModule?.locations ?? []).map((loc) => ({
+      facility: loc.facility ?? "",
+      city: loc.city ?? "",
+      state: loc.state ?? null,
+      country: loc.country ?? "",
+      recruitingStatus: loc.status ?? null,
+      contacts: (loc.contacts ?? []).map((c) => ({
+        name: c.name ?? null,
+        phone: c.phone ?? null,
+        email: c.email ?? null,
+        role: c.role ?? null,
+      })),
+    })),
+    sponsor: {
+      leadSponsor: p.sponsorCollaboratorsModule?.leadSponsor?.name ?? "",
+      collaborators: (p.sponsorCollaboratorsModule?.collaborators ?? [])
+        .map((c) => c.name ?? "")
+        .filter(Boolean),
+    },
+    interventions: (p.armsInterventionsModule?.interventions ?? []).map((i) => ({
+      type: i.type ?? "",
+      name: i.name ?? "",
+      description: i.description ?? null,
+    })),
+    references: {
+      pubmedIds: (p.referencesModule?.references ?? [])
+        .map((r) => r.pmid ?? "")
+        .filter(Boolean),
+      officialUrl: buildOfficialUrl(nctId),
+    },
+  };
+}
+
+// Used by Task 8.
+export type { RawStudy, RawSearchResponse };
 
 export const BASE_URL = BASE;
 export { InvalidInputError, NotFoundError, UpstreamError };
