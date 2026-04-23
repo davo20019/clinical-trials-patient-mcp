@@ -70,8 +70,35 @@ export class CTGovClient {
     return mapRawStudyToDetails(raw);
   }
 
-  async listConditions(_query: string): Promise<ConditionMatch[]> {
-    throw new Error("not implemented");
+  async listConditions(query: string): Promise<ConditionMatch[]> {
+    if (!query || !query.trim()) {
+      throw new InvalidInputError("`query` is required.");
+    }
+    const qs = new URLSearchParams();
+    qs.set("query.cond", query.trim());
+    qs.set("pageSize", "100");
+    qs.set("fields", "protocolSection.conditionsModule.conditions");
+    const url = `${BASE}/studies?${qs.toString()}`;
+    const raw = await this.fetcher.getJson<RawSearchResponse>(url);
+
+    const counts = new Map<string, number>();
+    for (const study of raw.studies ?? []) {
+      const conds = study.protocolSection?.conditionsModule?.conditions ?? [];
+      for (const c of conds) {
+        counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
+    }
+
+    const sorted = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([condition, studyCount]) => ({
+        condition,
+        synonyms: [], // v1: no synonym resolution
+        studyCount,
+      }));
+
+    return sorted;
   }
 }
 

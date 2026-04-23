@@ -84,3 +84,52 @@ describe("CTGovClient.getStudy", () => {
     await expect(client.getStudy("NCT00000000")).rejects.toThrow(/no trial found/i);
   });
 });
+
+describe("CTGovClient.listConditions", () => {
+  it("aggregates conditions from matching studies", async () => {
+    const fakeResponse = {
+      studies: [
+        {
+          protocolSection: {
+            identificationModule: { nctId: "NCT00000001" },
+            conditionsModule: {
+              conditions: ["Breast Cancer", "Triple Negative Breast Cancer"],
+            },
+          },
+        },
+        {
+          protocolSection: {
+            identificationModule: { nctId: "NCT00000002" },
+            conditionsModule: {
+              conditions: ["Breast Cancer", "HER2-positive Breast Cancer"],
+            },
+          },
+        },
+      ],
+    };
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(fakeResponse), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    const result = await client.listConditions("breast cancer");
+
+    const names = result.map((c) => c.condition);
+    expect(names).toContain("Breast Cancer");
+    // Most frequent should come first.
+    expect(result[0].condition).toBe("Breast Cancer");
+    expect(result[0].studyCount).toBe(2);
+    // Caps result length.
+    expect(result.length).toBeLessThanOrEqual(10);
+  });
+
+  it("rejects empty query", async () => {
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ studies: [] }), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+    await expect(client.listConditions("")).rejects.toThrow(/query/i);
+  });
+});
