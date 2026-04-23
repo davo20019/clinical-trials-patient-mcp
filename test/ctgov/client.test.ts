@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import searchFixture from "../fixtures/search-breast-cancer.json";
+import studyFixture from "../fixtures/study-NCT-example.json";
 import { CTGovClient } from "../../src/ctgov/client";
 import { CachedFetcher } from "../../src/ctgov/cache";
 
@@ -50,5 +51,36 @@ describe("CTGovClient.searchStudies", () => {
     expect(url).toContain("filter.phase=");
     expect(decodeURIComponent(url)).toContain("PHASE1");
     expect(decodeURIComponent(url)).toContain("EARLY_PHASE1");
+  });
+});
+
+describe("CTGovClient.getStudy", () => {
+  it("returns full TrialDetails on success", async () => {
+    const { client, fetchFn } = clientWithFixture(studyFixture);
+    const nctId = (studyFixture as any).protocolSection.identificationModule.nctId;
+
+    const result = await client.getStudy(nctId);
+
+    expect(result.identification.nctId).toBe(nctId);
+    expect(result.references.officialUrl).toBe(
+      `https://clinicaltrials.gov/study/${nctId}`
+    );
+    expect(typeof result.eligibility.criteria).toBe("string");
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[0][0].url).toContain(`/studies/${nctId}`);
+  });
+
+  it("rejects invalid NCT ID format", async () => {
+    const { client } = clientWithFixture(studyFixture);
+    await expect(client.getStudy("not-a-nct")).rejects.toThrow(/NCT ID/);
+  });
+
+  it("throws NotFoundError on upstream 404", async () => {
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response("not found", { status: 404 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+    await expect(client.getStudy("NCT00000000")).rejects.toThrow(/no trial found/i);
   });
 });

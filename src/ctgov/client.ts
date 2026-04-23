@@ -52,8 +52,22 @@ export class CTGovClient {
     };
   }
 
-  async getStudy(_nctId: string): Promise<TrialDetails> {
-    throw new Error("not implemented");
+  async getStudy(nctId: string): Promise<TrialDetails> {
+    validateNctId(nctId);
+    const url = `${BASE}/studies/${nctId}`;
+    let raw: RawStudy;
+    try {
+      raw = await this.fetcher.getJson<RawStudy>(url);
+    } catch (e) {
+      if (e instanceof UpstreamError && /\b404\b/.test(e.message)) {
+        throw new NotFoundError(`No trial found with ID ${nctId}.`);
+      }
+      throw e;
+    }
+    if (!raw?.protocolSection?.identificationModule?.nctId) {
+      throw new NotFoundError(`No trial found with ID ${nctId}.`);
+    }
+    return mapRawStudyToDetails(raw);
   }
 
   async listConditions(_query: string): Promise<ConditionMatch[]> {
