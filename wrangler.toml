@@ -1,0 +1,17 @@
+name = "clinical-trials-patient-mcp"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Rate limit: 60 requests per minute per client IP.
+# Verify this binding syntax matches the Wrangler version installed; the
+# `[[unsafe.bindings]]` form works across recent releases. If Cloudflare has
+# promoted the ratelimit binding to stable by now, switch to `[[ratelimit]]`.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+[observability]
+enabled = true
