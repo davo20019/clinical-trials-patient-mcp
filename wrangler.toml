@@ -27,6 +27,8 @@ tag = "v1"
 new_sqlite_classes = ["ClinicalTrialsPatientMcp"]
 
 # Rate limit: 60 requests per minute per client IP.
+# Uses unsafe.bindings with type=ratelimit which is the current wrangler
+# syntax for the Workers Rate Limiting API (Open Beta).
 [[unsafe.bindings]]
 name = "RATE_LIMITER"
 type = "ratelimit"

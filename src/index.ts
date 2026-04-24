@@ -2,21 +2,46 @@ import { ClinicalTrialsPatientMcp } from "./mcp-server";
 
 export { ClinicalTrialsPatientMcp };
 
-// Canonical MCP endpoint: /find-trials (under mcp.davidloor.com family).
-// Legacy /mcp kept alive so the workers.dev URL keeps working for anyone
-// who grabbed it during the first week. Safe to remove after migration
-// has been announced for a while.
 const CANONICAL_PATH = "/find-trials";
 const LEGACY_PATH = "/mcp";
+
+interface RateLimitBinding {
+  limit: (opts: { key: string }) => Promise<{ success: boolean }>;
+}
+
+interface Env {
+  RATE_LIMITER?: RateLimitBinding;
+  MCP_OBJECT: DurableObjectNamespace;
+}
 
 export default {
   async fetch(
     request: Request,
-    env: unknown,
+    env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+
+    // Skip rate limiting for health / index responses (cheap, and used by
+    // uptime monitors). Gate everything else on per-IP rate limit.
+    const isHealth = path === "/" || path === "/health";
+    if (!isHealth && env.RATE_LIMITER) {
+      const clientIp = request.headers.get("CF-Connecting-IP") ?? "unknown";
+      const { success } = await env.RATE_LIMITER.limit({ key: clientIp });
+      if (!success) {
+        return new Response(
+          "Too many requests. Please slow down and try again in a minute.",
+          {
+            status: 429,
+            headers: {
+              "content-type": "text/plain; charset=utf-8",
+              "retry-after": "60",
+            },
+          }
+        );
+      }
+    }
 
     if (path === CANONICAL_PATH || path.startsWith(`${CANONICAL_PATH}/`)) {
       return ClinicalTrialsPatientMcp.serve(CANONICAL_PATH).fetch(
@@ -42,7 +67,7 @@ export default {
       );
     }
 
-    if (path === "/" || path === "/health") {
+    if (isHealth) {
       return Response.json({
         name: "clinical-trials-patient-mcp",
         version: "0.1.0",
