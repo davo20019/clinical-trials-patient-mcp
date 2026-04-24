@@ -67,11 +67,15 @@ Returns identification, description, status, design, **full verbatim eligibility
 
 > **⚠️ This is an information tool, not medical advice.** Data may lag reality by weeks. Always confirm current enrollment by calling the trial site, and discuss any trial with the patient's treating physician before acting.
 
-**Live endpoint:** `https://clinical-trials-patient-mcp.davo20019.workers.dev/mcp`
+**Live endpoint:** `https://mcp.davidloor.com/find-trials`
 
-**In ChatGPT / Claude / other MCP clients:** add the URL above as a streamable-HTTP MCP server. A legacy SSE endpoint is available at `/sse`, and a health check at `/health`.
+**In ChatGPT / Claude / other MCP clients:** add the URL above as a streamable-HTTP MCP server.
 
-> You can also host your own copy in minutes — see [Self-hosting](#self-hosting) below.
+> *Legacy URL still live for back-compat:* `https://clinical-trials-patient-mcp.davo20019.workers.dev/mcp`
+>
+> This MCP lives under an **umbrella subdomain** (`mcp.davidloor.com`) that hosts a growing family of MCPs. Future siblings: `mcp.davidloor.com/drug-info`, `mcp.davidloor.com/rare-disease`, etc.
+
+You can also host your own copy in minutes — see [Self-hosting](#self-hosting) below.
 
 ---
 

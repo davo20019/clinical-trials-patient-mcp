@@ -3,6 +3,18 @@ main = "src/index.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Keep the *.workers.dev URL live so early-share links stay alive while the
+# canonical URL (below) takes over.
+workers_dev = true
+
+# Canonical routes: this MCP lives at mcp.davidloor.com/find-trials as part
+# of an umbrella hosting multiple MCPs on one subdomain. Each future MCP
+# binds to its own slug under mcp.davidloor.com.
+routes = [
+  { pattern = "mcp.davidloor.com/find-trials", zone_name = "davidloor.com" },
+  { pattern = "mcp.davidloor.com/find-trials/*", zone_name = "davidloor.com" },
+]
+
 # Durable Object binding required by the agents SDK's McpAgent.
 # The class is exported from src/index.ts. Session state is held per-connection
 # and is ephemeral; no persistent user data is stored.
