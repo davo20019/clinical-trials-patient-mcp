@@ -14,6 +14,7 @@ describe("searchTrialsTool", () => {
           status: "RECRUITING",
           conditions: ["Breast Cancer"],
           locations: [],
+          nearestSiteMiles: 3.4,
           sponsor: "Example Sponsor",
           lastUpdated: "2025-01-01",
           officialUrl: "https://clinicaltrials.gov/study/NCT00000001",
@@ -56,6 +57,34 @@ describe("searchTrialsTool", () => {
     );
   });
 
+  it("forwards radius search params", async () => {
+    const fakeResult = { totalCount: 1, trials: [], nextPageToken: null };
+    const fakeClient = {
+      searchStudies: vi.fn(async () => fakeResult),
+    } as any;
+
+    await searchTrialsTool(
+      {
+        condition: "breast cancer",
+        location: "80202",
+        radiusMiles: 50,
+        latitude: 39.7515,
+        longitude: -104.9977,
+      },
+      fakeClient
+    );
+
+    expect(fakeClient.searchStudies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: "breast cancer",
+        location: "80202",
+        radiusMiles: 50,
+        latitude: 39.7515,
+        longitude: -104.9977,
+      })
+    );
+  });
+
   it("validates inputs", async () => {
     const fakeClient = { searchStudies: vi.fn() } as any;
     await expect(
@@ -64,5 +93,8 @@ describe("searchTrialsTool", () => {
     await expect(
       searchTrialsTool({ condition: "x", phase: "bogus" as any }, fakeClient)
     ).rejects.toThrow();
+    await expect(
+      searchTrialsTool({ condition: "x", radiusMiles: 0 }, fakeClient)
+    ).rejects.toThrow(/radius/i);
   });
 });

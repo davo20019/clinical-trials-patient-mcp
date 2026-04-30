@@ -85,6 +85,121 @@ describe("CTGovClient.searchStudies", () => {
     const result = await client.searchStudies({ condition: "x" });
     expect(result.nextPageToken).toBeNull();
   });
+
+  it("uses CT.gov geo filtering for ZIP radius searches and sorts by nearest site", async () => {
+    const upstream = {
+      totalCount: 2,
+      studies: [
+        {
+          protocolSection: {
+            identificationModule: {
+              nctId: "NCT00000002",
+              briefTitle: "Boulder trial",
+            },
+            statusModule: {
+              overallStatus: "RECRUITING",
+              lastUpdatePostDateStruct: { date: "2026-01-01" },
+            },
+            contactsLocationsModule: {
+              locations: [
+                {
+                  facility: "Boulder Site",
+                  city: "Boulder",
+                  state: "Colorado",
+                  country: "United States",
+                  geoPoint: { lat: 40.015, lon: -105.2705 },
+                },
+              ],
+            },
+          },
+        },
+        {
+          protocolSection: {
+            identificationModule: {
+              nctId: "NCT00000001",
+              briefTitle: "Denver trial",
+            },
+            statusModule: {
+              overallStatus: "RECRUITING",
+              lastUpdatePostDateStruct: { date: "2026-01-01" },
+            },
+            contactsLocationsModule: {
+              locations: [
+                {
+                  facility: "Denver Site",
+                  city: "Denver",
+                  state: "Colorado",
+                  country: "United States",
+                  geoPoint: { lat: 39.7516, lon: -104.9977 },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    };
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(upstream), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    const result = await client.searchStudies({
+      condition: "breast cancer",
+      location: "80202",
+      radiusMiles: 50,
+    });
+
+    const calledUrl = decodeURIComponent(fetchFn.mock.calls[0][0].url);
+    expect(calledUrl).toContain(
+      "filter.geo=distance(39.7515,-104.9977,50mi)"
+    );
+    expect(calledUrl).not.toContain("query.locn=");
+    expect(result.trials.map((trial) => trial.nctId)).toEqual([
+      "NCT00000001",
+      "NCT00000002",
+    ]);
+    expect(result.trials[0].nearestSiteMiles).toBeLessThan(0.1);
+    expect(result.trials[1].nearestSiteMiles).toBeGreaterThan(20);
+  });
+
+  it("uses caller-provided coordinates for radius searches", async () => {
+    const upstream = { totalCount: 0, studies: [] };
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(upstream), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    await client.searchStudies({
+      condition: "breast cancer",
+      latitude: 39.7392,
+      longitude: -104.9903,
+      radiusMiles: 25,
+    });
+
+    const calledUrl = decodeURIComponent(fetchFn.mock.calls[0][0].url);
+    expect(calledUrl).toContain(
+      "filter.geo=distance(39.7392,-104.9903,25mi)"
+    );
+  });
+
+  it("rejects non-ZIP locations when radiusMiles is set", async () => {
+    const fetchFn = vi.fn<(req: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ studies: [] }), { status: 200 })
+    );
+    const fetcher = new CachedFetcher({ ttlSeconds: 0, fetchFn });
+    const client = new CTGovClient({ fetcher });
+
+    await expect(
+      client.searchStudies({
+        condition: "breast cancer",
+        location: "Denver, CO",
+        radiusMiles: 50,
+      })
+    ).rejects.toThrow(/ZIP code/i);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });
 
 describe("CTGovClient.getStudy", () => {

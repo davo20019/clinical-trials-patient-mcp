@@ -46,11 +46,13 @@ Find trials by condition, with patient-friendly defaults (**recruiting only** un
 |---|---|---|
 | `condition` | yes | `"Triple Negative Breast Cancer"` |
 | `location` | no | `"Denver, CO"`, `"Texas"`, `"80202"` |
+| `radiusMiles` | no | `50` with ZIP `location`, or with `latitude` + `longitude` |
+| `latitude` / `longitude` | no | `39.7392`, `-104.9903` for direct coordinate radius search |
 | `status` | no | `"recruiting"` (default), `"not_yet_recruiting"`, `"any"` |
 | `phase` | no | `"1"`, `"2"`, `"3"`, `"4"`, `"any"` (default) |
 | `pageSize` | no | `1`–`25`, default `10` |
 
-Returns an array of trials with title, brief summary, phase, status, per-site locations, sponsor, **last-updated date**, and the official ClinicalTrials.gov URL.
+Returns an array of trials with title, brief summary, phase, status, per-site locations, sponsor, **last-updated date**, and the official ClinicalTrials.gov URL. Radius searches add `nearestSiteMiles` when site coordinates are available.
 
 ### `get_trial_details`
 Full details for one trial by NCT ID.
@@ -144,7 +146,7 @@ See [`docs/superpowers/specs/`](./docs/superpowers/specs/) for the full design s
 
 ## Limits (v1)
 
-- **No geocoded radius search** (*"within 50 miles of 80202"*) — v1 accepts free-form location strings that the upstream API handles natively. Radius is a v2 candidate.
+- **ZIP radius search is U.S. ZCTA-based** — `location: "80202", radiusMiles: 50` uses a bundled U.S. Census ZCTA centroid table, then ClinicalTrials.gov's geo filter. City-name radius geocoding is not supported; pass `latitude` and `longitude` if exact coordinates are already known.
 - **No eligibility matching** — the LLM reads the criteria verbatim; this server just serves them. Only a trial coordinator can confirm whether a specific patient qualifies.
 - **No multi-source aggregation** (EU register, WHO ICTRP, etc.) — those would be sibling MCPs, not inside this one. See the spec's "Future Extensions" section.
 

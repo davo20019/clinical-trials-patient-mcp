@@ -1,4 +1,5 @@
 import { CachedFetcher } from "./cache";
+import { distanceMiles, resolveRadiusOrigin, roundMiles } from "./geo";
 import { InvalidInputError, NotFoundError, UpstreamError } from "../errors";
 import type {
   TrialSummary,
@@ -28,10 +29,20 @@ export class CTGovClient {
     const pageSize = Math.min(Math.max(params.pageSize ?? 10, 1), 25);
     const status = params.status ?? "recruiting";
     const phase = params.phase ?? "any";
+    const radiusOrigin = resolveRadiusOrigin(params);
 
     const qs = new URLSearchParams();
     qs.set("query.cond", params.condition.trim());
-    if (params.location) qs.set("query.locn", params.location.trim());
+    if (radiusOrigin) {
+      qs.set(
+        "filter.geo",
+        `distance(${formatCoordinate(radiusOrigin.lat)},${formatCoordinate(
+          radiusOrigin.lon
+        )},${params.radiusMiles}mi)`
+      );
+    } else if (params.location) {
+      qs.set("query.locn", params.location.trim());
+    }
     const statusValues = STATUS_MAP[status];
     if (statusValues.length > 0) {
       qs.set("filter.overallStatus", statusValues.join(","));
@@ -46,10 +57,13 @@ export class CTGovClient {
 
     const url = `${BASE}/studies?${qs.toString()}`;
     const raw = await this.fetcher.getJson<RawSearchResponse>(url);
+    const trials = raw.studies
+      .map((study) => mapRawStudyToSummary(study, radiusOrigin))
+      .sort((a, b) => compareNearestSiteMiles(a, b));
 
     return {
       totalCount: raw.totalCount ?? raw.studies.length,
-      trials: raw.studies.map(mapRawStudyToSummary),
+      trials,
       nextPageToken: raw.nextPageToken ?? null,
     };
   }
@@ -176,6 +190,10 @@ interface RawStudy {
           email?: string;
           role?: string;
         }>;
+        geoPoint?: {
+          lat?: number;
+          lon?: number;
+        };
       }>;
     };
     eligibilityModule?: {
@@ -198,11 +216,14 @@ interface RawStudy {
   };
 }
 
-function mapRawStudyToSummary(raw: RawStudy): TrialSummary {
+function mapRawStudyToSummary(
+  raw: RawStudy,
+  radiusOrigin: { lat: number; lon: number } | null = null
+): TrialSummary {
   const p = raw.protocolSection;
   const id = p.identificationModule;
   const nctId = id?.nctId ?? "";
-  return {
+  const summary: TrialSummary = {
     nctId,
     title: id?.briefTitle ?? "",
     briefSummary: p.descriptionModule?.briefSummary ?? "",
@@ -226,6 +247,15 @@ function mapRawStudyToSummary(raw: RawStudy): TrialSummary {
     lastUpdated: p.statusModule?.lastUpdatePostDateStruct?.date ?? "",
     officialUrl: buildOfficialUrl(nctId),
   };
+
+  const nearestSiteMiles = radiusOrigin
+    ? getNearestSiteMiles(p.contactsLocationsModule?.locations ?? [], radiusOrigin)
+    : null;
+  if (nearestSiteMiles !== null) {
+    summary.nearestSiteMiles = roundMiles(nearestSiteMiles);
+  }
+
+  return summary;
 }
 
 // Used by Task 7.
@@ -300,3 +330,31 @@ export type { RawStudy, RawSearchResponse };
 
 export const BASE_URL = BASE;
 export { InvalidInputError, NotFoundError, UpstreamError };
+
+function formatCoordinate(value: number): string {
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function getNearestSiteMiles(
+  locations: NonNullable<
+    RawStudy["protocolSection"]["contactsLocationsModule"]
+  >["locations"],
+  origin: { lat: number; lon: number }
+): number | null {
+  let nearest: number | null = null;
+  for (const loc of locations ?? []) {
+    const lat = loc.geoPoint?.lat;
+    const lon = loc.geoPoint?.lon;
+    if (lat === undefined || lon === undefined) continue;
+    const miles = distanceMiles(origin, { lat, lon });
+    nearest = nearest === null ? miles : Math.min(nearest, miles);
+  }
+  return nearest;
+}
+
+function compareNearestSiteMiles(a: TrialSummary, b: TrialSummary): number {
+  if (a.nearestSiteMiles === undefined && b.nearestSiteMiles === undefined) return 0;
+  if (a.nearestSiteMiles === undefined) return 1;
+  if (b.nearestSiteMiles === undefined) return -1;
+  return a.nearestSiteMiles - b.nearestSiteMiles;
+}

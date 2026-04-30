@@ -22,6 +22,7 @@ export interface TrialSummary {
   status: string;
   conditions: string[];
   locations: TrialLocation[];
+  nearestSiteMiles?: number;
   sponsor: string;
   lastUpdated: string;
   officialUrl: string;
@@ -90,6 +91,9 @@ export type StatusFilter = "recruiting" | "not_yet_recruiting" | "any";
 export interface SearchParams {
   condition: string;
   location?: string;
+  radiusMiles?: number;
+  latitude?: number;
+  longitude?: number;
   status?: StatusFilter;
   phase?: PhaseFilter;
   pageSize?: number;

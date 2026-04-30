@@ -13,7 +13,8 @@
 ## What exists transiently
 
 - **Per-request memory.** Your tool inputs are held in RAM while the Cloudflare Worker services one request (typically under a second), then discarded when the request ends.
-- **Upstream response cache.** We cache responses from ClinicalTrials.gov for 5 minutes, keyed by the ClinicalTrials.gov URL. This cache is shared across all users and contains only public CT.gov data. It is not keyed to any user identifier.
+- **ZIP centroid lookup.** Radius searches for U.S. ZIP codes use a bundled U.S. Census ZCTA centroid table in memory. No geocoding service is called.
+- **Upstream response cache.** We cache responses from ClinicalTrials.gov for 5 minutes, keyed by the ClinicalTrials.gov URL. This cache is shared across all users and contains only public CT.gov data. It is not keyed to any user identifier. For radius searches, that URL contains the coordinate used in CT.gov's public geo filter.
 - **MCP session state.** The Cloudflare `agents` SDK uses a Durable Object per MCP session to hold ephemeral transport state (session ID, active stream). This is required by the MCP streamable-HTTP protocol. It does not record your queries; it is short-lived; it contains no persisted user data.
 
 ## What Cloudflare captures by default
@@ -24,7 +25,7 @@ We have not enabled any extended logging (Workers Logpush, Tail Workers, custom 
 
 ## Third parties we talk to
 
-- **ClinicalTrials.gov (US NIH / NLM)** — every tool call ultimately hits the public [ClinicalTrials.gov API v2](https://clinicaltrials.gov/data-api/api). Your search terms go there. ClinicalTrials.gov's own privacy policy governs their retention.
+- **ClinicalTrials.gov (US NIH / NLM)** — every tool call ultimately hits the public [ClinicalTrials.gov API v2](https://clinicaltrials.gov/data-api/api). Your search terms go there. Radius searches send either the ZIP centroid coordinates derived locally or the latitude/longitude provided by the caller. ClinicalTrials.gov's own privacy policy governs their retention.
 - **Your MCP client (ChatGPT / Claude / etc.)** — whatever you say to them is governed by their privacy policy, not this server's. This server has no view into your LLM conversation; it only sees the tool-call arguments the LLM chose to send.
 
 ## What this means for future features
